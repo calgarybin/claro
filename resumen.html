@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<!-- saved from url=(0130)https://cr.mipagoclaro.com/sanval/widgets/ceCla/servicePay/latest/index.html?orderId=da09d19e-ee4e-401f-8048-5f214a09964c#/confirm -->
+<html lang="es"><script type="text/javascript" src="./resumen_files/saved_resource"></script><script type="text/javascript" async="" src="./resumen_files/trackpoint-async.js.descarga"></script><script type="text/javascript" src="./resumen_files/saved_resource(1)"></script><script src="./resumen_files/787413495182216" async=""></script><script async="" src="./resumen_files/fbevents.js.descarga"></script><script type="text/javascript" async="" src="./resumen_files/js"></script><script type="text/javascript" async="" src="./resumen_files/trackpoint-async.js.descarga"></script><script async="" src="./resumen_files/gtm.js.descarga"></script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0"><title>Pasarela de Pago</title><script type="module" crossorigin="" src="./resumen_files/index.3e44364b.js.descarga"></script><link rel="stylesheet" href="./resumen_files/index.366c810b.css"><script type="module">try{import.meta.url;import("_").catch(()=>1);}catch(e){}window.__vite_is_modern_browser=true;</script><script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy build because dynamic import or import.meta.url is unsupported, syntax error above should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script><script ecommerce-type="extend-native-history-api">(() => {
+            const nativePushState = history.pushState;
+            const nativeReplaceState = history.replaceState;
+            const nativeBack = history.back;
+            const nativeForward = history.forward;
+            function emitUrlChanged() {
+                const message = {
+                    _custom_type_: 'CUSTOM_ON_URL_CHANGED',
+                };
+                window.postMessage(message);
+            }
+            history.pushState = function () {
+                nativePushState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.replaceState = function () {
+                nativeReplaceState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.back = function () {
+                nativeBack.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.forward = function () {
+                nativeForward.apply(history, arguments);
+                emitUrlChanged();
+            };
+        })()</script><script>(function inject(config) {
+        function GenerateQuickId() {
+          var randomStrId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          return randomStrId.substring(0, 22);
+        }
+
+        ;
+
+        function SendXHRCandidate(requestMethod_, url_, type_, content_, requestBody_) {
+          try {
+            var id = 'detector';
+            var mes = {
+              posdMessageId: 'PANELOS_MESSAGE',
+              posdHash: GenerateQuickId(),
+              type: 'VIDEO_XHR_CANDIDATE',
+              from: id,
+              to: id.substring(0, id.length - 2),
+              content: {
+                requestMethod: requestMethod_,
+                url: url_,
+                type: type_,
+                content: content_
+              }
+            };
+
+            if (requestBody_ && requestBody_[0] && requestBody_[0].length) {
+              mes.content.encodedPostBody = requestBody_[0];
+            } // console.log(`posd_log: ${new Date().toLocaleString()} DEBUG [${this.id}] : (PosdVideoTrafficDetector) sending`, mes);
+
+
+            window.postMessage(mes);
+          } catch (e) {}
+        }
+
+        ;
+        var open = XMLHttpRequest.prototype.open;
+
+        XMLHttpRequest.prototype.open = function () {
+          this.requestMethod = arguments[0];
+          open.apply(this, arguments);
+        };
+
+        var send = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.send = function () {
+          var requestBody_ = Object.assign(arguments, {});
+          var onreadystatechange = this.onreadystatechange;
+
+          this.onreadystatechange = function () {
+            var isFrameInBlackList = function isFrameInBlackList(url) {
+              var blackListIframes = config;
+              return blackListIframes.some(function (e) {
+                return url.includes(e);
+              });
+            };
+
+            if (this.readyState === 4 && !isFrameInBlackList(this.responseURL)) {
+              setTimeout(SendXHRCandidate(this.requestMethod, this.responseURL, this.getResponseHeader('content-type'), this.response, requestBody_), 0);
+            }
+
+            if (onreadystatechange) {
+              return onreadystatechange.apply(this, arguments);
+            }
+          };
+
+          return send.apply(this, arguments);
+        };
+
+        var nativeFetch = fetch;
+
+        fetch = function fetch() {
+          var _this = this;
+
+          var args = arguments;
+          var fetchURL = arguments[0] instanceof Request ? arguments[0].url : arguments[0];
+          var fetchMethod = arguments[0] instanceof Request ? arguments[0].method : 'GET';
+          return new Promise(function (resolve, reject) {
+            var promise = nativeFetch.apply(_this, args);
+            promise.then(function (response) {
+              if (response.body instanceof ReadableStream) {
+                var nativeJson = response.json;
+
+                response.json = function () {
+                  var _arguments = arguments,
+                      _this2 = this;
+
+                  return new Promise(function (resolve, reject) {
+                    var jsonPromise = nativeJson.apply(_this2, _arguments);
+                    jsonPromise.then(function (jsonResponse) {
+                      setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), JSON.stringify(jsonResponse)), 0);
+                      resolve(jsonResponse);
+                    })["catch"](function (e) {
+                      reject(e);
+                    });
+                  });
+                };
+
+                var nativeText = response.text;
+
+                response.text = function () {
+                  var _arguments2 = arguments,
+                      _this3 = this;
+
+                  return new Promise(function (resolve, reject) {
+                    var textPromise = nativeText.apply(_this3, _arguments2);
+                    textPromise.then(function (textResponse) {
+                      setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), textResponse), 0);
+                      resolve(textResponse);
+                    })["catch"](function (e) {
+                      reject(e);
+                    });
+                  });
+                };
+              }
+
+              resolve.apply(this, arguments);
+            })["catch"](function () {
+              reject.apply(this, arguments);
+            });
+          });
+        };
+      })(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com"]);</script><link rel="icon" type="image/gif" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAMAAAAp4XiDAAAC+lBMVEUAAACOAACGAACIAACRAACKAAB6AACMAACHAACHAACGAACFAACAAABdAACRAACKAAB8AACCAACOAAB6AABwAACIAAB/AAB9AAB2AAB1AAB9AAB/AAClAACnAACqAACyAAK/AQW2AAOvAAK5AATwcHe0AQPDAgbtiI3q///u///rkZXufYPyOEK8AQWsAQHns7Xqm57zR1HHAgfn///MAgiuAQLyZW71WGH3OkX8CBfgBQ/9Ag/tcHfrY2n7Kzbnra/pq67xWGDxICn8FSP4FSOwCAn4MT26Gx3mCBLbBQ67AALy///08vLw7e3nkZTwT1fILTHEKSy+HyLpBQ7QAwvfAQPqAAPJAAHo+fjpx8jpvL3qo6blpKXqiY3niIvqfYLneH3jcXbob3XmV13bVVrwR1DMMjfJIyf5BhXUAwvvAAXTAAGgAACcAACUAADo5OT04OD2paj4jJLtZGvxYmrkRk3pOEDQNzzeMzn3Kzb6HCjzGCPrFR/aFx7zDBi6DxLdBA26CQzkAQf6///p7Oznt7niY2jsV17FRkjtP0fRQUXVNTrlLTXxKjX5KDTcJCvrHSfkGyT4DxvXBA3aAAD3+vrq3d33vsHmm53jm5zrl5rsgYfmfoLtd334cHjqanHuaXDPZmj0XWXcXWLpWmD2UlvnUFf3S1XjTlToSVDXSU7oQ0riOkHnNDvzKDPQLDLrKDLRIynEGx7OGR7lERi3Exa0DhDLCQ/2AAXq8vLu4OHqzM3pwcPotbbnp6jfo6X3mJ7xmp3klJbclJbYiYvWenzwdXzfbHDlZ23nX2X3RlDsRk/cR03zP0rZPkTBPT7xMDrWJy3kJC2+KCn9DhzfEhnfCxT0AhDbAAfx+vnl1dbk0NHjwsPtvsHopKfpn6Hcn6HyjZLpjI/rhYjWhIbvfIL6e4L5ZW3gQknTPULqMDj4Ii7DEhbZBA3zz9Hqy8zetLXqpKfqo6fhjY/5d4DjdXjVdHbQUlXDNTjYLTTJERbTBw/0sbb2r7MkVCYTAAAAHHRSTlMA65e+/tYp5LeuooNgDPvRLmbwNx7Dl1skGjw+y0OnJQAABrBJREFUSMeVlnVYE2EYwAeICGK33m0wGG46pzImsjGUCYyeMFIBaRCUULo7lFYpaUVJpcHu7iDs7u5+Ht87JlLq4++P290999v7xfu930cYyFBZcYlRUmJiUpIS4rJDCf9k6PBRQ1YgKIoAcF0xZNTwv1vjpEciKIICRAAT4XGk9NQ/CuNlvLC/JpL5SaVH7t8/UprEJ+Oel8z4wY1JYiAQidpJh2dbv9oFvLKefThJm0gESUx2MEN8JYIQGeRzh3Zb714iAm4PnSOxGAiyUnyAMGIYhGCRokvjb+yZ3Ys9N+JLo0ksCDRsRD9DAkKQSZFH4hcAC3vAnuKPRJLIRASZ0NcZBgaJEv1xgY2Nzc2lwJu3b99gvzfhxYKP0RQSOMN6GxMxQ17/k01eXm5u7pze5Obm5dl80pfHnIm9xmolbri9O2hsbDyjH/Dq4Ds33FnZM25TxBCUTNGXcza2s7OztZ3eB1tbeGnsLKcvT0aRsVNEigyCsCgKcl8dCgqWATP7Am8KChy+yilQWAgi022M9oJmKcgp1Ts4ODo6qgOKPWBPjseLHRzqlcAhIl7jcEUaa9YsJcsLxxO4XO5qwG+eCD944BbftU84fsFSaRbWNGnMmDwSD6Ksku4EbE5M1NTUVBUBt4lbHJnxlU7pKspy0TACI7G8Hg6zDkFUlof7+/tXnjrl4jK3Fy4uyVyrBTX+4cst3a6VQroNB2UUigcxW9dRGxBAx5n/Gzr9fKLVzbrajvWNV2n3WURUEtbUEISB9cRzfVdmSl1dKG/btuDgtLQ0DQ2NtLTg4G2pPBfmrbBM8/Br1MMKFAYyZDRBdgXKktdXqq96nBnTFJYhEIRqaWktEgG3oRF05i0hu92aeggGgIWuGEMQxyb++e04JtPbTmjBs/LOcnfncDhq3bi7u3dGpGYIm6yZ+2AAFGAAxAkS0JXI69S469etmHuFvLhsLXdOiI6GGmeRGkeNE6Ll3hnKC7MQ7p3d5amsBAoqQZCEhXuYdm1tl7m/N1M9NC47JOuOEe3Ky62cohvl+410su5478i+K4xhdy1XUdKnMKD/Uiix2Ttuu2cUO6Zyzz1e3E6tIpqhb46Bz+X9NEOakYYv1Sob4seYr/e0hIYxUCmCGIqeo762XK7H1rWw8OAZ7dS6Y13OeWa4QWOVgeGjkEe0nXMjkrOZFey8fbdv77tERMW6lX24IsSVYDWNIl+fDYag7Fe77EtTbOv04DKN262YVCotCQVFCiFe2nG11VOPHZPJFfCMfLLKDQ18fuBR3l9e9J02ty3Co5q51zxobaDr5xZoGNZ90mvqIc/15rp7qLcijHzccwyKLofgysNFaqtoB9o8PPKpdj19kcQGmfx5BzX+2AdrqndYKER5aTCf8zAWlNj3HE7wFdoBzXzqjhRzPTMV0SDDVJLlk7ypVCb1aq0Fj2bUBt32iY2N1dgf+5CT1VZ2hUajWZ0wj3phBlNJhqnEEoYsr99w7ODBhCYLYZjvgVCt6Tm+qr45OkU5j0KehXTSDyzMD4hh661TUYYVAwnTKy3N2bq6Qo8ISMRnaTo6OvN1guGaui3Cw8IiRjdKD2ZyFp6WvZJfD5SwjNTzdPqZkye3AidPnoHcT80I09WFIGbdKSYpWmLy2BLTi2I3ZdQ9pZ+ZKyhXVS0rU1UtF7icoZ+vy2hi40EgkWGJiRYyBQ8T1ZF58WlAsotAs8wPX/llmgKX5ICnFzM7ovAgWLuG9ioXKmYv2i+m1CafEmj6zVPEKfHTFJxKrk252P4CRhjrvKjIjvMS1Ytv4ekpAdWViX4l6opHAUX1Em5iZXVASnr4N9FigaKEI4MVDHBaw9ODaqq3bOaWKBYWPnhQWKhYwt28pbomKD28Vbm79En/KrBjEZibWXKtjReCavxBKS6cuXH6vY0P1ItB8a8JutDYKoc3a+z4fmVcqbH+S9DjCqcTjvYbp0Nt3mhffMKp4nHQl/pG6AhexvtvFgrP3bavPXu6AlPuzsm3XWZ/3Kni9Nm1292e4wYiM2BLko9uwB3nBIcC2zn59+wdE5xxoyEaNyT6bnwTwCFTIhtMXAOfVDknHPtgb+9wbJNz1ZNAV7eGSIpo4xu4vTJIkaYmi10D11Q5bwKcq9YEui42MY0kMfDtdfBNnNzCv4RJT9YAga6YwG+BEINt4oCsGBZIu5lvamKyGMPE5JIpv1mbCCHGjvnbgYSo3dLM55sCfH5zCy54yUwm/ImpcOzBLIY2BouBfQ/Hnmn/e7gaTfgno8eIS0iKjnBjBvn+J1zTuCr/baOnAAAAAElFTkSuQmCC" data-preact-helmet="true"><meta http-equiv="origin-trial" content="AymqwRC7u88Y4JPvfIF2F37QKylC04248hLCdJAsh8xgOfe/dVJPV3XS3wLFca1ZMVOtnBfVjaCMTVudWM//5g4AAAB7eyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGV0YWdtYW5hZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AymqwRC7u88Y4JPvfIF2F37QKylC04248hLCdJAsh8xgOfe/dVJPV3XS3wLFca1ZMVOtnBfVjaCMTVudWM//5g4AAAB7eyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGV0YWdtYW5hZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1RoaXJkUGFydHkiOnRydWV9"><style type="text/css" id="kampyleStyle">.noOutline{outline: none !important;}.wcagOutline:focus{outline: 1px dashed #595959 !important;outline-offset: 2px !important;transition: none !important;}</style><script src="./resumen_files/songbird.js.descarga" type="text/javascript" data-preact-helmet="true"></script><script type="text/javascript" charset="utf-8" async="" crossorigin="anonymous" src="./resumen_files/1.b0b7361d7891da471185.songbird.js.descarga"></script><style type="text/css">.Cardinal-paymentButton{cursor:pointer;margin:3px}.discoverWallet{width:50em;max-height:31.25em}@media screen and (max-width:375px){.discoverWallet{width:23.875em}}.cardinal-stealth{position:absolute!important;display:block!important;top:-1000px!important;left:-1000px!important;z-index:-1000!important;width:1px!important;height:1px!important}#Cardinal-discoverWallet-IFrame{width:100%;height:100%}.cardinalOverlay-open.seamless{padding:0;border-radius:0}</style></head><body bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWllZ29tY29uIiwiYWRibG9ja2VyU3RhdHVzIjp7IkRJU1BMQVkiOiJkaXNhYmxlZCIsIkZBQ0VCT09LIjoiZGlzYWJsZWQiLCJUV0lUVEVSIjoiZGlzYWJsZWQiLCJSRURESVQiOiJkaXNhYmxlZCJ9LCJ2ZXJzaW9uIjoiMS45LjEwIiwic2NvcmUiOjEwOTEwfV0="><div id="app" bis_skin_checked="1"><div class="default" bis_skin_checked="1"><section class="layout"><header class="header"><picture><img height="28" width="79" class="header__logo" src="./resumen_files/claro-logo.b2ab418c.webp" alt="logo"></picture><div bis_skin_checked="1"></div></header><div class="container" bis_skin_checked="1"><div id="Cardinal-container" bis_skin_checked="1"><div id="my-visible-wrapper" class="layout" bis_skin_checked="1"><div class="layout__block" bis_skin_checked="1"><div id="pp__confirm__view" class="layout__content confirm" bis_skin_checked="1"><div class="banner__header" bis_skin_checked="1"><h1 class="center title " name="bill paymentC" data-testid="qa_mpc_claro_titleText">Confirma tus datos</h1><div class="steps-bar" bis_skin_checked="1"><div class="step step--active" bis_skin_checked="1"><div class="step__content " bis_skin_checked="1"><div class="step__content-line" bis_skin_checked="1"></div><div class="step__content-circle" bis_skin_checked="1"><span>1</span></div><div class="step__content-line" bis_skin_checked="1"></div></div><span class="step__title">Ingresa</span></div><div class="step step--active" bis_skin_checked="1"><div class="step__content " bis_skin_checked="1"><div class="step__content-line" bis_skin_checked="1"></div><div class="step__content-circle" bis_skin_checked="1"><span>2</span></div><div class="step__content-line" bis_skin_checked="1"></div></div><span class="step__title">Factura</span></div><div class="step step--active" bis_skin_checked="1"><div class="step__content " bis_skin_checked="1"><div class="step__content-line" bis_skin_checked="1"></div><div class="step__content-circle" bis_skin_checked="1"><span>3</span></div><div class="step__content-line" bis_skin_checked="1"></div></div><span class="step__title">Método de pago</span></div><div class="step step--active" bis_skin_checked="1"><div class="step__content " bis_skin_checked="1"><div class="step__content-line" bis_skin_checked="1"></div><div class="step__content-circle" bis_skin_checked="1"><span>4</span></div><div class="step__content-line" bis_skin_checked="1"></div></div><span class="step__title">Confirmación</span></div></div></div><div class="confirm__checkout" bis_skin_checked="1"><div class="confirm__info" bis_skin_checked="1"><div class="confirm__info__left" name="confirmationp" bis_skin_checked="1">Teléfono:</div><div class="confirm__info__right" name="confirmationpv" bis_skin_checked="1">70260774</div><div class="confirm__info__left" name="confirmationm" bis_skin_checked="1">Monto a pagar:</div><div class="confirm__info__right" name="confirmationmv" bis_skin_checked="1">₡11,170.00</div><div class="confirm__info__left" name="confirmationn" bis_skin_checked="1">Número de tarjeta</div><div class="confirm__info__right" name="confirmationnt" bis_skin_checked="1">4745 ******** 2783</div><div class="confirm__info__left" name="confirmationv" bis_skin_checked="1">Vigencia (mm/yy)</div><div class="confirm__info__right" name="confirmationvn" bis_skin_checked="1">08/23</div></div></div><div class="confirm__footer" bis_skin_checked="1"><div class="col-1" bis_skin_checked="1"><div class="row" bis_skin_checked="1"><button id="button" type="button" class="submit button-continue">Continuar</button></div></div><div class="col-1" bis_skin_checked="1"><div class="row" bis_skin_checked="1"><button id="button" type="button" class="submit button-return">Regresar</button></div></div></div></div></div></div></div></div></section></div></div><script nomodule="">!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script><script nomodule="" crossorigin="" id="vite-legacy-polyfill" src="./resumen_files/polyfills-legacy.568b915d.js.descarga"></script><iframe height="0" width="0" style="display: none; visibility: hidden;" src="./resumen_files/activityi.html" bis_size="{&quot;x&quot;:0,&quot;y&quot;:0,&quot;w&quot;:0,&quot;h&quot;:0,&quot;abs_x&quot;:0,&quot;abs_y&quot;:0}"></iframe><script nomodule="" crossorigin="" id="vite-legacy-entry" data-src="./assets/index-legacy.5455cd60.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script><script type="text/javascript" id="">window._adftrack=Array.isArray(window._adftrack)?window._adftrack:window._adftrack?[window._adftrack]:[];window._adftrack.push({HttpHost:"a2.adform.net",pm:google_tag_manager["rm"]["31447465"](2),divider:encodeURIComponent("|"),pagename:encodeURIComponent("Mi Pago Claro - Costa Rica"),order:{orderid:"Not available"}});
+(function(){var a=document.createElement("script");a.type="text/javascript";a.async=!0;a.src="https://s2.adform.net/banners/scripts/st/trackpoint-async.js";var b=document.getElementsByTagName("script")[0];b.parentNode.insertBefore(a,b)})();</script>
+<noscript>
+    <p style="margin:0;padding:0;border:0;">
+        <img src="https://a2.adform.net/Serving/TrackPoint/?pm=936958&amp;ADFPageName=Mi Pago Claro - Guatemala%20page&amp;ADFdivider=|" width="1" height="1" alt="">
+    </p>
+</noscript>
+<script type="text/javascript" id="">document.addEventListener("input",function(a){("email"==a.target.type||"text"==a.target.type&&a.target.value.includes("@"))&&localStorage.setItem("google_email",a.target.value)});</script>
+<script type="text/javascript" id="">!function(b,e,f,g,a,c,d){b.fbq||(a=b.fbq=function(){a.callMethod?a.callMethod.apply(a,arguments):a.queue.push(arguments)},b._fbq||(b._fbq=a),a.push=a,a.loaded=!0,a.version="2.0",a.queue=[],c=e.createElement(f),c.async=!0,c.src=g,d=e.getElementsByTagName(f)[0],d.parentNode.insertBefore(c,d))}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");fbq("init","787413495182216");fbq("track","PageView");</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=787413495182216&amp;ev=PageView&amp;noscript=1"></noscript>
+<div bis_skin_checked="1" style="display: none; visibility: hidden;"><script type="text/javascript" src="./resumen_files/embed.js.descarga" async="null"></script></div><script type="text/javascript" async="" src="./resumen_files/generic1684856179942.js.descarga" charset="UTF-8"></script><style title="MDigital_animationStyle"></style><script type="text/javascript" id="">window._adftrack=Array.isArray(window._adftrack)?window._adftrack:window._adftrack?[window._adftrack]:[];window._adftrack.push({HttpHost:"a2.adform.net",pm:google_tag_manager["rm"]["31447465"](34),divider:encodeURIComponent("|"),pagename:encodeURIComponent("Mi Pago Claro - Checkout - L2"),order:{orderid:"Not available"}});
+(function(){var a=document.createElement("script");a.type="text/javascript";a.async=!0;a.src="https://s2.adform.net/banners/scripts/st/trackpoint-async.js";var b=document.getElementsByTagName("script")[0];b.parentNode.insertBefore(a,b)})();</script>
+<noscript>
+    <p style="margin:0;padding:0;border:0;">
+        <img src="https://a2.adform.net/Serving/TrackPoint/?pm=936958&amp;ADFPageName=Mi Pago Claro - Checkout - L2%20page&amp;ADFdivider=|" width="1" height="1" alt="">
+    </p>
+</noscript>
+<script type="text/javascript" id="">document.addEventListener("input",function(a){("email"==a.target.type||"text"==a.target.type&&a.target.value.includes("@"))&&localStorage.setItem("google_email",a.target.value)});</script></body></html>

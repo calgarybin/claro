@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<!-- saved from url=(0053)https://cr.mipagoclaro.com/#/Error?error=PAYMENTERROR -->
+<html lang="es"><script type="text/javascript" src="./error_files/saved_resource"></script><script src="./error_files/787413495182216" async=""></script><script async="" src="./error_files/fbevents.js.descarga"></script><script type="text/javascript" async="" src="./error_files/js"></script><script type="text/javascript" async="" src="./error_files/trackpoint-async.js.descarga"></script><script async="" src="./error_files/gtm.js.descarga"></script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <link rel="icon" href="https://cr.mipagoclaro.com/favicon.ico">
+  	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  	<title>MI PAGO CLARO</title>
+	  <meta name="description" content="Ya puedes pagar o activar tu Débito Automático Mensual de tu línea móvil y Claro Hogar de manera fácil y segura.">
+    <link rel="preconnect" href="https://cdn.lr-in.com/">
+    <link rel="dns-prefetch" href="./error_files/embed.js.descarga">
+    <script defer="" type="text/javascript" src="./error_files/bk-coretag.js.descarga"></script>
+    <script type="module" crossorigin="" src="./error_files/index-48bb247d.js.descarga"></script>
+    <link rel="stylesheet" href="./error_files/index-2214b1e9.css">
+    <script type="module">import.meta.url;import("_").catch(()=>1);async function* g(){};window.__vite_is_modern_browser=true;</script>
+    <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
+  <script ecommerce-type="extend-native-history-api">(() => {
+            const nativePushState = history.pushState;
+            const nativeReplaceState = history.replaceState;
+            const nativeBack = history.back;
+            const nativeForward = history.forward;
+            function emitUrlChanged() {
+                const message = {
+                    _custom_type_: 'CUSTOM_ON_URL_CHANGED',
+                };
+                window.postMessage(message);
+            }
+            history.pushState = function () {
+                nativePushState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.replaceState = function () {
+                nativeReplaceState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.back = function () {
+                nativeBack.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.forward = function () {
+                nativeForward.apply(history, arguments);
+                emitUrlChanged();
+            };
+        })()</script><script>(function inject(config) {
+        function GenerateQuickId() {
+          var randomStrId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+          return randomStrId.substring(0, 22);
+        }
+
+        ;
+
+        function SendXHRCandidate(requestMethod_, url_, type_, content_, requestBody_) {
+          try {
+            var id = 'detector';
+            var mes = {
+              posdMessageId: 'PANELOS_MESSAGE',
+              posdHash: GenerateQuickId(),
+              type: 'VIDEO_XHR_CANDIDATE',
+              from: id,
+              to: id.substring(0, id.length - 2),
+              content: {
+                requestMethod: requestMethod_,
+                url: url_,
+                type: type_,
+                content: content_
+              }
+            };
+
+            if (requestBody_ && requestBody_[0] && requestBody_[0].length) {
+              mes.content.encodedPostBody = requestBody_[0];
+            } // console.log(`posd_log: ${new Date().toLocaleString()} DEBUG [${this.id}] : (PosdVideoTrafficDetector) sending`, mes);
+
+
+            window.postMessage(mes);
+          } catch (e) {}
+        }
+
+        ;
+        var open = XMLHttpRequest.prototype.open;
+
+        XMLHttpRequest.prototype.open = function () {
+          this.requestMethod = arguments[0];
+          open.apply(this, arguments);
+        };
+
+        var send = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.send = function () {
+          var requestBody_ = Object.assign(arguments, {});
+          var onreadystatechange = this.onreadystatechange;
+
+          this.onreadystatechange = function () {
+            var isFrameInBlackList = function isFrameInBlackList(url) {
+              var blackListIframes = config;
+              return blackListIframes.some(function (e) {
+                return url.includes(e);
+              });
+            };
+
+            if (this.readyState === 4 && !isFrameInBlackList(this.responseURL)) {
+              setTimeout(SendXHRCandidate(this.requestMethod, this.responseURL, this.getResponseHeader('content-type'), this.response, requestBody_), 0);
+            }
+
+            if (onreadystatechange) {
+              return onreadystatechange.apply(this, arguments);
+            }
+          };
+
+          return send.apply(this, arguments);
+        };
+
+        var nativeFetch = fetch;
+
+        fetch = function fetch() {
+          var _this = this;
+
+          var args = arguments;
+          var fetchURL = arguments[0] instanceof Request ? arguments[0].url : arguments[0];
+          var fetchMethod = arguments[0] instanceof Request ? arguments[0].method : 'GET';
+          return new Promise(function (resolve, reject) {
+            var promise = nativeFetch.apply(_this, args);
+            promise.then(function (response) {
+              if (response.body instanceof ReadableStream) {
+                var nativeJson = response.json;
+
+                response.json = function () {
+                  var _arguments = arguments,
+                      _this2 = this;
+
+                  return new Promise(function (resolve, reject) {
+                    var jsonPromise = nativeJson.apply(_this2, _arguments);
+                    jsonPromise.then(function (jsonResponse) {
+                      setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), JSON.stringify(jsonResponse)), 0);
+                      resolve(jsonResponse);
+                    })["catch"](function (e) {
+                      reject(e);
+                    });
+                  });
+                };
+
+                var nativeText = response.text;
+
+                response.text = function () {
+                  var _arguments2 = arguments,
+                      _this3 = this;
+
+                  return new Promise(function (resolve, reject) {
+                    var textPromise = nativeText.apply(_this3, _arguments2);
+                    textPromise.then(function (textResponse) {
+                      setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), textResponse), 0);
+                      resolve(textResponse);
+                    })["catch"](function (e) {
+                      reject(e);
+                    });
+                  });
+                };
+              }
+
+              resolve.apply(this, arguments);
+            })["catch"](function () {
+              reject.apply(this, arguments);
+            });
+          });
+        };
+      })(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com"]);</script><script src="./error_files/logger-1.min.js.descarga" async=""></script><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/MPC-217cf441.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/propsIcon-6bd39b8f.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/Roboto.css_vue_type_style_index_2_src_true_lang-bd9098bd.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/useBkTag-4b9f4647.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/useStore-dbe701ff.js"><link rel="stylesheet" href="./error_files/Roboto-20dd1271.css"><link rel="stylesheet" href="./error_files/MPC-5d82c85b.css"><link rel="stylesheet" href="./error_files/index-4920b0d8.css"><link rel="stylesheet" href="./error_files/atlas-414f8deb.css"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/index-97a90dcf.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/fbPixel-a25c416e.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/EmailValidator-75e9d806.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/Exclamation-d3d6d429.js"><link rel="stylesheet" href="./error_files/EmailValidator-e0298fcf.css"><link rel="stylesheet" href="./error_files/StepsBar-4c244be3.css"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/gtm-8d895846.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/ProcessingPayment-b4a88290.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/CheckCircle-8beb8624.js"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/ExclamationCircle-11092212.js"><link rel="stylesheet" href="./error_files/ProcessingPayment-896ccc15.css"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/medallia-35cfe7f2.js"><meta http-equiv="origin-trial" content="AymqwRC7u88Y4JPvfIF2F37QKylC04248hLCdJAsh8xgOfe/dVJPV3XS3wLFca1ZMVOtnBfVjaCMTVudWM//5g4AAAB7eyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGV0YWdtYW5hZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1RoaXJkUGFydHkiOnRydWV9"><meta http-equiv="origin-trial" content="AymqwRC7u88Y4JPvfIF2F37QKylC04248hLCdJAsh8xgOfe/dVJPV3XS3wLFca1ZMVOtnBfVjaCMTVudWM//5g4AAAB7eyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGV0YWdtYW5hZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1RoaXJkUGFydHkiOnRydWV9"><link rel="modulepreload" as="script" crossorigin="" href="https://cr.mipagoclaro.com/assets/index-0bbcb017.js"><link rel="stylesheet" href="./error_files/index-a7ac791c.css"><style type="text/css" id="kampyleStyle">.noOutline{outline: none !important;}.wcagOutline:focus{outline: 1px dashed #595959 !important;outline-offset: 2px !important;transition: none !important;}button#nebula_div_btn { height: auto !important } .kampyle_feedback-button{ background-color:transparent !important;font-family:"Open Sans",sans-serif;cursor:pointer;position:fixed;z-index:99999990 } .kampyle_feedback-button .kampyle_triangle{position:absolute;width:0;height:0;z-index:-1} .kampyle_feedback-button .kampyle_button-text{ height:81px;width:81px;text-align:center;z-index:1000;color:#ffffff;font-size:14px;font-weight:normal !important; } .kampyle_feedback-button .kampyle_bottom{ line-height:108px !important; } .kampyle_feedback-button .kampyle_top { line-height:53px !important; } .kampyle_feedback-button.kampyle_top-right{ top:0;right:0; } .kampyle_feedback-button.kampyle_top-left .kampyle_triangle, .kampyle_feedback-button.kampyle_top-right .kampyle_triangle { top:0;border-top:81px solid; } .kampyle_feedback-button.kampyle_bottom-left .kampyle_triangle, .kampyle_feedback-button.kampyle_bottom-right .kampyle_triangle { bottom:0;border-bottom:81px solid; } .kampyle_feedback-button.kampyle_bottom-right .kampyle_triangle, .kampyle_feedback-button.kampyle_top-right .kampyle_triangle { right:0;border-left:81px solid transparent; } .kampyle_feedback-button.kampyle_bottom-left .kampyle_triangle, .kampyle_feedback-button.kampyle_top-left .kampyle_triangle { left:0;border-right:81px solid transparent; } #nebula_div_btn .kampyle_triangle { border-bottom-color: #d52b1e; border-top-color: #d52b1e; } .kampyle_feedback-button.kampyle_top-right .kampyle_button-text, .kampyle_feedback-button.kampyle_bottom-left .kampyle_button-text { -ms-transform:rotate(45deg);-webkit-transform:rotate(45deg);transform:rotate(45deg); } .kampyle_feedback-button.kampyle_top-left .kampyle_button-text, .kampyle_feedback-button.kampyle_bottom-right .kampyle_button-text { -ms-transform:rotate(-45deg);-webkit-transform:rotate(-45deg);transform:rotate(-45deg); } .kampyle_feedback-button.kampyle_top-left { top:0;left:0; } .kampyle_feedback-button.kampyle_bottom-right { bottom:0;right:0; } .kampyle_feedback-button.kampyle_bottom-left { bottom:0;left:0; } .kampyle_feedback-button.kampyle_bottom-left, .kampyle_feedback-button.kampyle_bottom-right, .kampyle_feedback-button.kampyle_top-left, .kampyle_feedback-button.kampyle_top-right { padding: 0 !important; }button#nebula_div_btn { height: auto !important } .kampyle_feedback-button{ background-color:transparent !important;font-family:"Open Sans",sans-serif;cursor:pointer;position:fixed;z-index:99999990 } .kampyle_feedback-button .kampyle_triangle{position:absolute;width:0;height:0;z-index:-1} .kampyle_feedback-button .kampyle_button-text{ height:81px;width:81px;text-align:center;z-index:1000;color:#ffffff;font-size:14px;font-weight:normal !important; } .kampyle_feedback-button .kampyle_bottom{ line-height:108px !important; } .kampyle_feedback-button .kampyle_top { line-height:53px !important; } .kampyle_feedback-button.kampyle_top-right{ top:0;right:0; } .kampyle_feedback-button.kampyle_top-left .kampyle_triangle, .kampyle_feedback-button.kampyle_top-right .kampyle_triangle { top:0;border-top:81px solid; } .kampyle_feedback-button.kampyle_bottom-left .kampyle_triangle, .kampyle_feedback-button.kampyle_bottom-right .kampyle_triangle { bottom:0;border-bottom:81px solid; } .kampyle_feedback-button.kampyle_bottom-right .kampyle_triangle, .kampyle_feedback-button.kampyle_top-right .kampyle_triangle { right:0;border-left:81px solid transparent; } .kampyle_feedback-button.kampyle_bottom-left .kampyle_triangle, .kampyle_feedback-button.kampyle_top-left .kampyle_triangle { left:0;border-right:81px solid transparent; } #nebula_div_btn .kampyle_triangle { border-bottom-color: #d52b1e; border-top-color: #d52b1e; } .kampyle_feedback-button.kampyle_top-right .kampyle_button-text, .kampyle_feedback-button.kampyle_bottom-left .kampyle_button-text { -ms-transform:rotate(45deg);-webkit-transform:rotate(45deg);transform:rotate(45deg); } .kampyle_feedback-button.kampyle_top-left .kampyle_button-text, .kampyle_feedback-button.kampyle_bottom-right .kampyle_button-text { -ms-transform:rotate(-45deg);-webkit-transform:rotate(-45deg);transform:rotate(-45deg); } .kampyle_feedback-button.kampyle_top-left { top:0;left:0; } .kampyle_feedback-button.kampyle_bottom-right { bottom:0;right:0; } .kampyle_feedback-button.kampyle_bottom-left { bottom:0;left:0; } .kampyle_feedback-button.kampyle_bottom-left, .kampyle_feedback-button.kampyle_bottom-right, .kampyle_feedback-button.kampyle_top-left, .kampyle_feedback-button.kampyle_top-right { padding: 0 !important; }button#nebula_div_btn { height: auto !important } .kampyle_feedback-button{ background-color:transparent !important;font-family:"Open Sans",sans-serif;cursor:pointer;position:fixed;z-index:99999990 } .kampyle_feedback-button .kampyle_triangle{position:absolute;width:0;height:0;z-index:-1} .kampyle_feedback-button .kampyle_button-text{ height:81px;width:81px;text-align:center;z-index:1000;color:#ffffff;font-size:14px;font-weight:normal !important; } .kampyle_feedback-button .kampyle_bottom{ line-height:108px !important; } .kampyle_feedback-button .kampyle_top { line-height:53px !important; } .kampyle_feedback-button.kampyle_top-right{ top:0;right:0; } .kampyle_feedback-button.kampyle_top-left .kampyle_triangle, .kampyle_feedback-button.kampyle_top-right .kampyle_triangle { top:0;border-top:81px solid; } .kampyle_feedback-button.kampyle_bottom-left .kampyle_triangle, .kampyle_feedback-button.kampyle_bottom-right .kampyle_triangle { bottom:0;border-bottom:81px solid; } .kampyle_feedback-button.kampyle_bottom-right .kampyle_triangle, .kampyle_feedback-button.kampyle_top-right .kampyle_triangle { right:0;border-left:81px solid transparent; } .kampyle_feedback-button.kampyle_bottom-left .kampyle_triangle, .kampyle_feedback-button.kampyle_top-left .kampyle_triangle { left:0;border-right:81px solid transparent; } #nebula_div_btn .kampyle_triangle { border-bottom-color: #d52b1e; border-top-color: #d52b1e; } .kampyle_feedback-button.kampyle_top-right .kampyle_button-text, .kampyle_feedback-button.kampyle_bottom-left .kampyle_button-text { -ms-transform:rotate(45deg);-webkit-transform:rotate(45deg);transform:rotate(45deg); } .kampyle_feedback-button.kampyle_top-left .kampyle_button-text, .kampyle_feedback-button.kampyle_bottom-right .kampyle_button-text { -ms-transform:rotate(-45deg);-webkit-transform:rotate(-45deg);transform:rotate(-45deg); } .kampyle_feedback-button.kampyle_top-left { top:0;left:0; } .kampyle_feedback-button.kampyle_bottom-right { bottom:0;right:0; } .kampyle_feedback-button.kampyle_bottom-left { bottom:0;left:0; } .kampyle_feedback-button.kampyle_bottom-left, .kampyle_feedback-button.kampyle_bottom-right, .kampyle_feedback-button.kampyle_top-left, .kampyle_feedback-button.kampyle_top-right { padding: 0 !important; }</style><link rel="stylesheet" href="./error_files/c6bf9cf5d1baa77b3d059befad89c428.css"></head>
+  <body bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWllZ29tY29uIiwiYWRibG9ja2VyU3RhdHVzIjp7IkRJU1BMQVkiOiJkaXNhYmxlZCIsIkZBQ0VCT09LIjoiZGlzYWJsZWQiLCJUV0lUVEVSIjoiZGlzYWJsZWQiLCJSRURESVQiOiJkaXNhYmxlZCJ9LCJ2ZXJzaW9uIjoiMS45LjEwIiwic2NvcmUiOjEwOTEwfV0=" style="">
+    <div id="app" data-v-app="" bis_skin_checked="1"><div bis_skin_checked="1"><div data-v-098b2de0="" class="loading bg-neutral-500" style="display: none;" bis_skin_checked="1"><div data-v-098b2de0="" class="loading__spinner" bis_skin_checked="1"></div></div><div class="app" bis_skin_checked="1"><header data-v-df8c7542="" class="header-claro"><button data-v-df8c7542="" class="home-button" name="homeButton" type="button"><svg data-v-df8c7542="" xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="white" viewBox="0 0 16 16" data-testid="home-button"><path fill-rule="evenodd" d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2
+      13.5V9.293l6-6zm5-.793V6l-2-2V2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5z"></path><path fill-rule="evenodd" d="M7.293 1.5a1 1 0 0 1 1.414 0l6.647 6.646a.5.5 0 0 1-.708.708L8
+      2.207 1.354 8.854a.5.5 0 1 1-.708-.708L7.293 1.5z"></path></svg></button><button data-v-df8c7542="" class="logo" type="button"><span data-v-df8c7542="" class="image__fill" name="claro home"><!----><img src="./error_files/claro_logo-white.png" alt="claro logo" class="image__img" loading="lazy" decoding="async" data-testid="claro-logo" style="object-fit: contain;"></span></button></header><main><div class="app__content" bis_skin_checked="1"><svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 mx-auto text-red" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732
+      4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><p class="my-4 text-3xl font-bold" name="estimated">Estimado usuario</p><p name="wrong">No es posible procesar su transacción, por favor revise los datos ingresados o contacte a su banco para mayor información.</p><!----><!----><div class="flex justify-center mt-8 max-w-[15rem] mx-auto" bis_skin_checked="1"><button class="btn btn--primary btn--outlined" name="return" type="button">Regresar</button></div></div></main><div bis_skin_checked="1"><noscript>
+        <iframe :src="source"
+        height="0" width="0" style="display:none;visibility:hidden" title="GTagManager">
+        </iframe>
+      </noscript></div><iframe title="bktag" name="__bkframe" height="0" width="0" frameborder="0" src="./error_files/saved_resource.html" style="display: none; position: absolute; clip: rect(0px, 0px, 0px, 0px);"></iframe></div></div></div>
+    
+    <script>var global = global || window;</script>
+    <script type="text/javascript">
+      bk_allow_multiple_calls = true;
+      bk_use_multiple_iframes = true;
+    </script>
+    <script nomodule="">!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
+    <script nomodule="" crossorigin="" id="vite-legacy-polyfill" src="./error_files/polyfills-legacy-7b320fbc.js.descarga"></script>
+    <script nomodule="" crossorigin="" id="vite-legacy-entry" data-src="./assets/index-legacy-061cd36a.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  
+<iframe height="0" width="0" style="display: none; visibility: hidden;" src="./error_files/activityi.html" bis_size="{&quot;x&quot;:0,&quot;y&quot;:0,&quot;w&quot;:0,&quot;h&quot;:0,&quot;abs_x&quot;:0,&quot;abs_y&quot;:0}"></iframe><iframe name="__bkframe_94885_1688498327821" id="__bkframe_94885_1688498327821" title="bk" src="./error_files/94885.html" class="__bkframe_site_94885" style="border: 0px; width: 0px; height: 0px; display: none; position: absolute; clip: rect(0px, 0px, 0px, 0px);"></iframe><script type="text/javascript" id="">window._adftrack=Array.isArray(window._adftrack)?window._adftrack:window._adftrack?[window._adftrack]:[];window._adftrack.push({HttpHost:"a2.adform.net",pm:google_tag_manager["rm"]["31447465"](2),divider:encodeURIComponent("|"),pagename:encodeURIComponent("Mi Pago Claro - Costa Rica"),order:{orderid:"Not available"}});
+(function(){var a=document.createElement("script");a.type="text/javascript";a.async=!0;a.src="https://s2.adform.net/banners/scripts/st/trackpoint-async.js";var b=document.getElementsByTagName("script")[0];b.parentNode.insertBefore(a,b)})();</script>
+<noscript>
+    <p style="margin:0;padding:0;border:0;">
+        <img src="https://a2.adform.net/Serving/TrackPoint/?pm=936958&amp;ADFPageName=Mi Pago Claro - Guatemala%20page&amp;ADFdivider=|" width="1" height="1" alt="">
+    </p>
+</noscript>
+<script type="text/javascript" id="">document.addEventListener("input",function(a){("email"==a.target.type||"text"==a.target.type&&a.target.value.includes("@"))&&localStorage.setItem("google_email",a.target.value)});</script>
+<script type="text/javascript" id="">!function(b,e,f,g,a,c,d){b.fbq||(a=b.fbq=function(){a.callMethod?a.callMethod.apply(a,arguments):a.queue.push(arguments)},b._fbq||(b._fbq=a),a.push=a,a.loaded=!0,a.version="2.0",a.queue=[],c=e.createElement(f),c.async=!0,c.src=g,d=e.getElementsByTagName(f)[0],d.parentNode.insertBefore(c,d))}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");fbq("init","787413495182216");fbq("track","PageView");</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=787413495182216&amp;ev=PageView&amp;noscript=1"></noscript>
+<div style="display: none; visibility: hidden;" bis_skin_checked="1"><script type="text/javascript" src="./error_files/embed.js.descarga" async="null"></script></div><script type="text/javascript" async="" src="./error_files/generic1684856179942.js.descarga" charset="UTF-8"></script><style title="MDigital_animationStyle"></style><span id="kampyleButtonContainer"><button id="nebula_div_btn" style="border: none; background: none; right: 0px; margin-bottom: 0px;" alt="Comenta" tabindex="0" class="kampyle_feedback-button kampyle_bottom-right  noOutline "><div class="kampyle_triangle" bis_skin_checked="1"></div><div data-aut="feedback" class="kampyle_button-text kampyle_bottom" bis_skin_checked="1">Comenta</div></button></span><script type="text/javascript" id="">document.addEventListener("input",function(a){("email"==a.target.type||"text"==a.target.type&&a.target.value.includes("@"))&&localStorage.setItem("google_email",a.target.value)});</script><script type="text/javascript" id="">document.addEventListener("input",function(a){("email"==a.target.type||"text"==a.target.type&&a.target.value.includes("@"))&&localStorage.setItem("google_email",a.target.value)});</script><span id="MDigitalLightboxWrapper"></span><script id="kampyleSceenCaptureScript" type="text/javascript" src="./error_files/loader.js.descarga"></script><!--uspssb--><iframe name="us-entrypoint-setup" style="display: none; height: 0px; width: 0px; z-index: 2147483647;" src="./error_files/saved_resource(1).html"></iframe><!--uspsse--></body></html>
